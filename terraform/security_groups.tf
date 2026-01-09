@@ -1,4 +1,4 @@
-# checkov:skip=CKV_AWS_260: Public HTTP access required for dev/demo frontend
+# checkov:skip=CKV_AWS_260: Public HTTP access required for dev/demo
 resource "aws_security_group" "backend_sg" {
   name        = "${var.project}-backend-sg"
   description = "Backend EC2 security group"
@@ -6,25 +6,24 @@ resource "aws_security_group" "backend_sg" {
 
   # tfsec:ignore:aws-ec2-no-public-ingress-sgr
   ingress {
-    description = "Allow HTTP from internet"
+    description = "Allow HTTP from internet (DEV ONLY)"
     from_port   = 80
     to_port     = 80
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
-  
-  # tfsec:ignore:aws-ec2-no-public-ingress-sgr
+
   ingress {
-    description     = "Allow app traffic internally"
-    from_port       = 3000
-    to_port         = 3000
-    protocol        = "tcp"
-    cidr_blocks     = [var.vpc_cidr]
+    description = "Internal app traffic"
+    from_port   = 3000
+    to_port     = 3000
+    protocol    = "tcp"
+    cidr_blocks = [var.vpc_cidr]
   }
 
   # tfsec:ignore:aws-ec2-no-public-egress-sgr
   egress {
-    description = "Allow outbound HTTPS only"
+    description = "Outbound HTTPS"
     from_port   = 443
     to_port     = 443
     protocol    = "tcp"
