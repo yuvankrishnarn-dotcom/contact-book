@@ -30,6 +30,11 @@ resource "aws_db_parameter_group" "postgres" {
     name  = "log_statement"
     value = "all"
   }
+
+  parameter {
+    name  = "rds.force_ssl"
+    value = "1"
+  }
 }
 
 ################################

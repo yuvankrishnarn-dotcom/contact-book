@@ -1,3 +1,4 @@
+# checkov:skip=CKV_AWS_260: Public HTTP access required for dev/demo frontend
 resource "aws_security_group" "backend_sg" {
   name        = "${var.project}-backend-sg"
   description = "Backend EC2 security group"
