@@ -3,16 +3,12 @@ resource "aws_instance" "backend" {
   instance_type = var.instance_type
   subnet_id     = aws_subnet.public_1.id
 
-  vpc_security_group_ids = [
-    aws_security_group.backend_sg.id
-  ]
+  vpc_security_group_ids = [aws_security_group.backend_sg.id]
 
-  # Enforce IMDSv2
   metadata_options {
     http_tokens = "required"
   }
 
-  # Encrypted root volume
   root_block_device {
     encrypted = true
   }
