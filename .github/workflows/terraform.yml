@@ -43,10 +43,13 @@ jobs:
         run: terraform validate
         working-directory: ${{ env.TF_DIR }}
 
-      - name: TFLint
-        uses: terraform-linters/tflint-action@v3
-        with:
-          working-directory: ${{ env.TF_DIR }}
+      - name: Install TFLint
+        run: |
+          curl -s https://raw.githubusercontent.com/terraform-linters/tflint/master/install_linux.sh | bash
+
+      - name: Run TFLint
+        run: tflint
+        working-directory: ${{ env.TF_DIR }}
 
       - name: tfsec
         uses: aquasecurity/tfsec-action@v1.0.3
