@@ -9,7 +9,8 @@ on:
 permissions:
   id-token: write
   contents: read
-  pull-requests: write
+  pull-quests: write
+  security-events: write
 
 env:
   AWS_REGION: ap-south-1
@@ -36,36 +37,55 @@ jobs:
           terraform_version: 1.6.6
 
       - name: Terraform Init
-        run: terraform init
+        run: terraform init -upgrade
         working-directory: ${{ env.TF_DIR }}
 
       - name: Terraform Validate
         run: terraform validate
         working-directory: ${{ env.TF_DIR }}
 
-      - name: Install TFLint
-        run: |
-          curl -s https://raw.githubusercontent.com/terraform-linters/tflint/master/install_linux.sh | bash
+      # --------------------
+      # TFLINT (official)
+      # --------------------
+      - name: Setup TFLint
+        uses: terraform-linters/setup-tflint@v4
+        with:
+          tflint_version: v0.50.3
 
       - name: Run TFLint
-        run: tflint
+        run: |
+          tflint --init
+          tflint
         working-directory: ${{ env.TF_DIR }}
 
+      # --------------------
+      # TFSEC (pinned)
+      # --------------------
       - name: Install tfsec
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          curl -s https://raw.githubusercontent.com/aquasecurity/tfsec/master/scripts/install_linux.sh | bash
+          curl -sSL https://raw.githubusercontent.com/aquasecurity/tfsec/v1.28.14/scripts/install_linux.sh | bash
 
       - name: Run tfsec
         run: tfsec .
         working-directory: ${{ env.TF_DIR }}
 
-
-      - name: Checkov
+      # --------------------
+      # CHECKOV (SARIF)
+      # --------------------
+      - name: Run Checkov
         uses: bridgecrewio/checkov-action@v12
         with:
           directory: ${{ env.TF_DIR }}
+          framework: terraform
+          output_format: sarif
+          output_file_path: results.sarif
+
+      - name: Upload Checkov results
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: results.sarif
 
   cost:
     name: Cost Estimation
