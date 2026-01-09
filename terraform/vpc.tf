@@ -79,61 +79,69 @@ resource "aws_route_table_association" "public_2" {
 }
 
 ################################
-# VPC FLOW LOGS (IAM + LOG GROUP)
+# KMS KEY (VPC FLOW LOGS)
 ################################
+resource "aws_kms_key" "vpc_logs" {
+  description             = "KMS key for VPC Flow Logs encryption"
+  deletion_window_in_days = 7
+  enable_key_rotation     = true
+}
 
-# IAM Role for VPC Flow Logs
+################################
+# IAM ROLE FOR VPC FLOW LOGS
+################################
 resource "aws_iam_role" "vpc_flow_logs" {
   name = "${var.project}-vpc-flow-logs-role"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [
-      {
-        Effect    = "Allow"
-        Principal = {
-          Service = "vpc-flow-logs.amazonaws.com"
-        }
-        Action = "sts:AssumeRole"
+    Statement = [{
+      Effect    = "Allow"
+      Principal = {
+        Service = "vpc-flow-logs.amazonaws.com"
       }
-    ]
+      Action = "sts:AssumeRole"
+    }]
   })
 }
 
-# IAM Policy for Flow Logs
+################################
+# CLOUDWATCH LOG GROUP (ENCRYPTED)
+################################
+resource "aws_cloudwatch_log_group" "vpc_flow_logs" {
+  name              = "/aws/vpc/${var.project}-flow-logs"
+  retention_in_days = 7
+  kms_key_id        = aws_kms_key.vpc_logs.arn
+}
+
+################################
+# IAM POLICY (LEAST PRIVILEGE)
+################################
 resource "aws_iam_role_policy" "vpc_flow_logs" {
   role = aws_iam_role.vpc_flow_logs.id
 
   policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [
-      {
-        Effect = "Allow"
-        Action = [
-          "logs:CreateLogGroup",
-          "logs:CreateLogStream",
-          "logs:PutLogEvents",
-          "logs:DescribeLogGroups",
-          "logs:DescribeLogStreams"
-        ]
-        Resource = "*"
-      }
-    ]
+    Statement = [{
+      Effect = "Allow"
+      Action = [
+        "logs:CreateLogStream",
+        "logs:PutLogEvents",
+        "logs:DescribeLogStreams"
+      ]
+      Resource = "${aws_cloudwatch_log_group.vpc_flow_logs.arn}:*"
+    }]
   })
 }
 
-# CloudWatch Log Group
-resource "aws_cloudwatch_log_group" "vpc_flow_logs" {
-  name              = "/aws/vpc/${var.project}-flow-logs"
-  retention_in_days = 7
-}
-
-# VPC Flow Log
+################################
+# VPC FLOW LOG
+################################
 resource "aws_flow_log" "vpc" {
-  vpc_id               = aws_vpc.main.id
-  traffic_type         = "ALL"
-  log_destination      = aws_cloudwatch_log_group.vpc_flow_logs.arn
-  iam_role_arn         = aws_iam_role.vpc_flow_logs.arn
-  max_aggregation_interval = 60
+  vpc_id                    = aws_vpc.main.id
+  traffic_type              = "ALL"
+  log_destination           = aws_cloudwatch_log_group.vpc_flow_logs.arn
+  iam_role_arn              = aws_iam_role.vpc_flow_logs.arn
+  max_aggregation_interval  = 60
 }
 
