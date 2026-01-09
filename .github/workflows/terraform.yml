@@ -51,10 +51,16 @@ jobs:
         run: tflint
         working-directory: ${{ env.TF_DIR }}
 
-      - name: tfsec
-        uses: aquasecurity/tfsec-action@v1.0.3
-        with:
-          working_directory: ${{ env.TF_DIR }}
+      - name: Install tfsec
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          curl -s https://raw.githubusercontent.com/aquasecurity/tfsec/master/scripts/install_linux.sh | bash
+
+      - name: Run tfsec
+        run: tfsec .
+        working-directory: ${{ env.TF_DIR }}
+
 
       - name: Checkov
         uses: bridgecrewio/checkov-action@v12
