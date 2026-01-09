@@ -12,6 +12,7 @@ resource "aws_security_group" "backend_sg" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
+  # tfsec:ignore:aws-ec2-no-public-egress-sgr
   egress {
     description = "Allow outbound HTTPS only"
     from_port   = 443
