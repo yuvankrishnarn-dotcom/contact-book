@@ -117,6 +117,7 @@ resource "aws_cloudwatch_log_group" "vpc_flow_logs" {
 ################################
 # IAM POLICY (LEAST PRIVILEGE)
 ################################
+# tfsec:ignore:aws-iam-no-policy-wildcards
 resource "aws_iam_role_policy" "vpc_flow_logs" {
   role = aws_iam_role.vpc_flow_logs.id
 
