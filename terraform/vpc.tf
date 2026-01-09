@@ -1,6 +1,3 @@
-################################
-# VPC
-################################
 resource "aws_vpc" "main" {
   cidr_block           = var.vpc_cidr
   enable_dns_support   = true
@@ -11,85 +8,46 @@ resource "aws_vpc" "main" {
   }
 }
 
-################################
-# Internet Gateway
-################################
-resource "aws_internet_gateway" "igw" {
+resource "aws_default_security_group" "default" {
   vpc_id = aws_vpc.main.id
-
-  tags = {
-    Name = "${var.project}-igw"
-  }
 }
 
-################################
-# Public Subnets
-################################
-# tfsec:ignore:aws-ec2-no-public-ip-subnet
-resource "aws_subnet" "public_1" {
-  vpc_id                  = aws_vpc.main.id
-  cidr_block              = var.public_subnet_cidr_1
-  availability_zone       = data.aws_availability_zones.available.names[0]
-  map_public_ip_on_launch = true
-
-  tags = {
-    Name = "${var.project}-public-1"
-  }
+resource "aws_subnet" "private_1" {
+  vpc_id            = aws_vpc.main.id
+  cidr_block        = var.private_subnet_cidr_1
+  availability_zone = data.aws_availability_zones.available.names[0]
 }
 
-# tfsec:ignore:aws-ec2-no-public-ip-subnet
-resource "aws_subnet" "public_2" {
-  vpc_id                  = aws_vpc.main.id
-  cidr_block              = var.public_subnet_cidr_2
-  availability_zone       = data.aws_availability_zones.available.names[1]
-  map_public_ip_on_launch = true
-
-  tags = {
-    Name = "${var.project}-public-2"
-  }
+resource "aws_subnet" "private_2" {
+  vpc_id            = aws_vpc.main.id
+  cidr_block        = var.private_subnet_cidr_2
+  availability_zone = data.aws_availability_zones.available.names[1]
 }
 
-################################
-# Route Table
-################################
-resource "aws_route_table" "public" {
-  vpc_id = aws_vpc.main.id
-
-  route {
-    cidr_block = "0.0.0.0/0"
-    gateway_id = aws_internet_gateway.igw.id
-  }
-
-  tags = {
-    Name = "${var.project}-public-rt"
-  }
-}
-
-################################
-# Route Table Associations
-################################
-resource "aws_route_table_association" "public_1" {
-  subnet_id      = aws_subnet.public_1.id
-  route_table_id = aws_route_table.public.id
-}
-
-resource "aws_route_table_association" "public_2" {
-  subnet_id      = aws_subnet.public_2.id
-  route_table_id = aws_route_table.public.id
-}
-
-################################
-# KMS KEY (VPC FLOW LOGS)
-################################
+# ---------------- KMS for logs ----------------
 resource "aws_kms_key" "vpc_logs" {
-  description             = "KMS key for VPC Flow Logs encryption"
-  deletion_window_in_days = 7
-  enable_key_rotation     = true
+  description         = "KMS key for VPC flow logs"
+  enable_key_rotation = true
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect    = "Allow"
+      Principal = {
+        AWS = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"
+      }
+      Action   = "kms:*"
+      Resource = "*"
+    }]
+  })
 }
 
-################################
-# IAM ROLE FOR VPC FLOW LOGS
-################################
+resource "aws_cloudwatch_log_group" "vpc_flow_logs" {
+  name              = "/aws/vpc/${var.project}-flow-logs"
+  retention_in_days = 365
+  kms_key_id        = aws_kms_key.vpc_logs.arn
+}
+
 resource "aws_iam_role" "vpc_flow_logs" {
   name = "${var.project}-vpc-flow-logs-role"
 
@@ -97,27 +55,12 @@ resource "aws_iam_role" "vpc_flow_logs" {
     Version = "2012-10-17"
     Statement = [{
       Effect    = "Allow"
-      Principal = {
-        Service = "vpc-flow-logs.amazonaws.com"
-      }
-      Action = "sts:AssumeRole"
+      Principal = { Service = "vpc-flow-logs.amazonaws.com" }
+      Action    = "sts:AssumeRole"
     }]
   })
 }
 
-################################
-# CLOUDWATCH LOG GROUP (ENCRYPTED)
-################################
-resource "aws_cloudwatch_log_group" "vpc_flow_logs" {
-  name              = "/aws/vpc/${var.project}-flow-logs"
-  retention_in_days = 7
-  kms_key_id        = aws_kms_key.vpc_logs.arn
-}
-
-################################
-# IAM POLICY (LEAST PRIVILEGE)
-################################
-# tfsec:ignore:aws-iam-no-policy-wildcards
 resource "aws_iam_role_policy" "vpc_flow_logs" {
   role = aws_iam_role.vpc_flow_logs.id
 
@@ -127,22 +70,18 @@ resource "aws_iam_role_policy" "vpc_flow_logs" {
       Effect = "Allow"
       Action = [
         "logs:CreateLogStream",
-        "logs:PutLogEvents",
-        "logs:DescribeLogStreams"
+        "logs:PutLogEvents"
       ]
-      Resource = "${aws_cloudwatch_log_group.vpc_flow_logs.arn}:*"
+      Resource = aws_cloudwatch_log_group.vpc_flow_logs.arn
     }]
   })
 }
 
-################################
-# VPC FLOW LOG
-################################
 resource "aws_flow_log" "vpc" {
-  vpc_id                    = aws_vpc.main.id
-  traffic_type              = "ALL"
-  log_destination           = aws_cloudwatch_log_group.vpc_flow_logs.arn
-  iam_role_arn              = aws_iam_role.vpc_flow_logs.arn
-  max_aggregation_interval  = 60
+  vpc_id               = aws_vpc.main.id
+  traffic_type         = "ALL"
+  log_destination_type = "cloud-watch-logs"
+  log_destination      = aws_cloudwatch_log_group.vpc_flow_logs.arn
+  iam_role_arn         = aws_iam_role.vpc_flow_logs.arn
 }
 

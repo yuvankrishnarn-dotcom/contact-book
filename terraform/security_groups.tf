@@ -11,6 +11,15 @@ resource "aws_security_group" "backend_sg" {
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
+  
+  # tfsec:ignore:aws-ec2-no-public-ingress-sgr
+  ingress {
+    description     = "Allow app traffic internally"
+    from_port       = 3000
+    to_port         = 3000
+    protocol        = "tcp"
+    cidr_blocks     = [var.vpc_cidr]
+  }
 
   # tfsec:ignore:aws-ec2-no-public-egress-sgr
   egress {
